@@ -1,7 +1,10 @@
 package com.siva.bank_api;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,6 +15,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import com.siva.bank_api.model.BankAccount;
 import com.siva.bank_api.service.BankService;
 import com.siva.bank_api.model.BankTransaction;
+import com.siva.bank_api.model.BankAccountEntity;
+import com.siva.bank_api.model.BankTransactionEntity;
 
 @RestController
 @RequestMapping("/api")
@@ -24,17 +29,15 @@ public class BankController {
     }
 
     @GetMapping("/accounts")
-    public List<BankAccount> getAllAccounts() {
+    public List<BankAccountEntity> getAllAccounts() {
         return bankService.getAllAccounts();
     }
 
-    @GetMapping ("/accounts/{accountNumber}")
-    public Object getAccountByNumber(@PathVariable int accountNumber) {
-        BankAccount account = bankService.getAccountByNumber(accountNumber);
-        if (account == null){
-            return "Account not found.";
-        }
-        return account;
+    @GetMapping("/accounts/{accountNumber}")
+    public BankAccountEntity getAccountByNumber(
+            @PathVariable int accountNumber) {
+
+        return bankService.getAccountByNumber(accountNumber);
     }
 
     @PostMapping("/accounts")
@@ -73,17 +76,10 @@ public class BankController {
     }
 
     @GetMapping("/accounts/{accountNumber}/transactions")
-    public Object getTransactionHistory(
+    public List<BankTransactionEntity> getTransactionHistory(
             @PathVariable int accountNumber) {
 
-        List<BankTransaction> transactions =
-                bankService.getTransactionHistory(accountNumber);
-
-        if (transactions == null) {
-            return "Account not found.";
-        }
-
-        return transactions;
+        return bankService.getTransactionHistory(accountNumber);
     }
 
     public record BankAccountRequest(
@@ -93,5 +89,18 @@ public class BankController {
             String accountType
     ) {
     }
+
+    @GetMapping("/accounts/{accountNumber}/balance")
+public ResponseEntity<Map<String, Object>> getBalance(
+        @PathVariable int accountNumber) {
+
+    double balance = bankService.getBalance(accountNumber);
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("accountNumber", accountNumber);
+    response.put("balance", balance);
+
+    return ResponseEntity.ok(response);
+}
 
 }

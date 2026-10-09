@@ -25,6 +25,9 @@ public class BankAccountEntity {
         this.accountType = accountType;
     }
 
+    protected BankAccountEntity() {
+    }
+
     public Long getId() {
         return id;
     }
