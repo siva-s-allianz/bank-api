@@ -5,20 +5,23 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.siva.bank_api.model.BankTransaction;
 import com.siva.bank_api.model.BankAccount;
-import com.siva.bank_api.model.CurrentAccount;
-import com.siva.bank_api.model.SavingsAccount;
 import com.siva.bank_api.repository.BankAccountRepository;
 import com.siva.bank_api.model.BankAccountEntity;
+import com.siva.bank_api.model.BankTransactionEntity;
+import com.siva.bank_api.repository.BankTransactionRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BankService {
     private final List<BankAccount> accounts = new ArrayList<>();
     private final BankAccountRepository bankAccountRepository;
-    public BankService(BankAccountRepository bankAccountRepository) {
-    this.bankAccountRepository = bankAccountRepository;
-}
+    private final BankTransactionRepository bankTransactionRepository;
+    public BankService(BankAccountRepository bankAccountRepository,
+                       BankTransactionRepository bankTransactionRepository) {
+        this.bankAccountRepository = bankAccountRepository;
+        this.bankTransactionRepository = bankTransactionRepository;
+    }
 
    public String createAccount(
         String customerName,
@@ -56,60 +59,71 @@ public class BankService {
 
     return "Account created successfully.";
 }
-    public List<BankAccount> getAllAccounts() {
-        return accounts;
+    public List<BankAccountEntity> getAllAccounts() {
+        return bankAccountRepository.findAll();
     }
 
-    public BankAccount getAccountByNumber(int accountNumber){
-        for(BankAccount account : accounts){
-            if(account.getAccountNumber() == accountNumber){
-                return account;
-            }
-        }
-        return null;
-    }
+    public BankAccountEntity getAccountByNumber(int accountNumber) {
+    return bankAccountRepository
+            .findByAccountNumber(accountNumber)
+            .orElseThrow(() ->
+                    new RuntimeException("Account not found: " + accountNumber)
+            );
+}
 
-    public String deposit(int accountNUmber, double amount){
-        BankAccount account = getAccountByNumber(accountNUmber);
-        if(account == null){
-            return "Account not found.";
-        }
+    @Transactional
+    public String deposit(int accountNumber, double amount) {
 
-        if(amount<=0){
+        if (amount <= 0) {
             return "Deposit amount must be greater than 0.";
         }
 
-        account.deposit(amount);
-        return "Deposit successful. Current balance:" + account.getBalance();
+        BankAccountEntity account = getAccountByNumber(accountNumber);
+
+        account.setBalance(account.getBalance() + amount);
+        bankAccountRepository.save(account);
+
+        BankTransactionEntity transaction =
+                new BankTransactionEntity(
+                        accountNumber,
+                        "DEPOSIT",
+                        amount
+                );
+
+        bankTransactionRepository.save(transaction);
+
+        return "Deposit successful. Current balance: "
+                + account.getBalance();
     }
-    public String withdraw(int accountNumber, double amount){
-        BankAccount account = getAccountByNumber(accountNumber);
 
-        if(account == null){
-            return "Account not found";
-        }
-
-        if(amount <= 0){
+    @Transactional
+    public String withdraw(int accountNumber, double amount) {
+        if (amount <= 0) {
             return "Withdrawal amount must be greater than 0.";
         }
-        try{
-            account.withdraw(amount);
-            return "Withdrawal successful. Current balance: " + account.getBalance();
-        }catch (RuntimeException e){
-            return e.getMessage();
+        BankAccountEntity account = getAccountByNumber(accountNumber);
+
+        if (amount > account.getBalance()) {
+            return "Insufficient balance for withdrawal. Current balance: "
+                    + account.getBalance();
         }
+        account.setBalance(account.getBalance() - amount);
+        bankAccountRepository.save(account);
+        BankTransactionEntity transaction =
+                new BankTransactionEntity(
+                        accountNumber,
+                        "WITHDRAWAL",
+                        amount
+                );
+        bankTransactionRepository.save(transaction);
+        return "Withdrawal successful. Current balance: "
+                + account.getBalance();
     }
 
-   public List<BankTransaction> getTransactionHistory(int accountNumber) {
-
-    BankAccount account = getAccountByNumber(accountNumber);
-
-    if (account == null) {
-        return null;
+   public double getBalance(int accountNumber) {
+        BankAccountEntity account = getAccountByNumber(accountNumber);
+        return account.getBalance();
     }
-
-    return account.getTransactionHistory();
-}
 
 public BankAccountEntity saveTestAccount() {
 
@@ -121,5 +135,13 @@ public BankAccountEntity saveTestAccount() {
     );
 
     return bankAccountRepository.save(account);
-}
+    }
+
+    public List<BankTransactionEntity> getTransactionHistory(int accountNumber) {
+
+    getAccountByNumber(accountNumber);
+
+    return bankTransactionRepository
+            .findByAccountNumberOrderByIdDesc(accountNumber);
+    }
 }
