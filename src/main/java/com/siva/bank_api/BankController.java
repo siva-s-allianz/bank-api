@@ -40,26 +40,76 @@ public class BankController {
         return bankService.getAccountByNumber(accountNumber);
     }
 
+    
     @PostMapping("/accounts")
-    public String createAccount(@RequestBody BankAccountRequest request) {
+    public ResponseEntity<String> createAccount(
+            @RequestBody BankAccountRequest request) {
 
-        return bankService.createAccount(
-                request.customerName(),
+        if (request.customerName() == null ||
+                request.customerName().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body("Customer name must not be empty.");
+        }
+
+        if (request.accountNumber() <= 0) {
+            return ResponseEntity.badRequest()
+                    .body("Account number must be greater than 0.");
+        }
+        
+        if (request.accountType() == null ||
+                (!request.accountType().equalsIgnoreCase("Savings") &&
+                !request.accountType().equalsIgnoreCase("Current"))) {
+
+            return ResponseEntity.badRequest()
+                    .body("Account type must be Savings or Current.");
+        }
+
+        if (!Double.isFinite(request.balance()) || request.balance() <= 0) {
+            return ResponseEntity.badRequest()
+                    .body("Initial balance must be greater than zero.");
+        }
+
+        String result = bankService.createAccount(
+                request.customerName().trim(),
                 request.accountNumber(),
                 request.balance(),
                 request.accountType()
         );
+
+        if (result.equals("Account created successfully")) {
+            return ResponseEntity.status(201).body(result);
+        }
+
+        return ResponseEntity.badRequest().body(result);
     }
 
+
+    
     @PostMapping("/accounts/{accountNumber}/deposit")
-    public String deposit(
+    public ResponseEntity<String> deposit(
             @PathVariable int accountNumber,
             @RequestBody DepositRequest request) {
 
-        return bankService.deposit(
+        if (accountNumber <= 0) {
+            return ResponseEntity.badRequest()
+                    .body("Account number must be greater than 0.");
+        }
+
+        if (!Double.isFinite(request.amount()) || request.amount() <= 0) {
+            return ResponseEntity.badRequest()
+                    .body("Deposit amount must be greater than 0.");
+        }
+
+        String result = bankService.deposit(
                 accountNumber,
                 request.amount()
         );
+
+        if ("Deposit successful".equalsIgnoreCase(result)) {
+            return ResponseEntity.ok(result);
+        }
+
+        return ResponseEntity.badRequest().body(result);
     }
     public record DepositRequest(double amount) {
     }
