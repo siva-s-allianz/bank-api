@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bankdb}
+      POSTGRES_USER: ${POSTGRES_USER:-bankuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-bankdb}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-bankuser}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_JPA_HIBERNATE_DDLAUTO: update
+      SPRING_JPA_OPEN_IN_VIEW: "false"
+      SERVER_PORT: "8080"
+      BANK_SECURITY_USERPASSWORD: ${BANK_USER_PASSWORD:?Set BANK_USER_PASSWORD in .env}
+      BANK_SECURITY_ADMINPASSWORD: ${BANK_ADMIN_PASSWORD:?Set BANK_ADMIN_PASSWORD in .env}
+      BANK_JWT_SECRET: ${BANK_JWT_SECRET:?Set BANK_JWT_SECRET in .env}
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

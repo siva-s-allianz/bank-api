@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,10 +20,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 
 
 @Configuration
@@ -30,7 +31,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http)
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
         throws Exception {
 
     http
@@ -40,32 +41,39 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http)
             .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
         )
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/auth/login","/auth/refresh","/auth/logout").permitAll()
             .requestMatchers("/api/public/**").permitAll()
             .requestMatchers("/api/admin/**").hasRole("ADMIN")
             .requestMatchers("/api/accounts/**").authenticated()
             .anyRequest().authenticated()
         )
         .exceptionHandling(ex -> ex
-    .authenticationEntryPoint((request, response, exception) -> {
-        response.setStatus(401);
-        response.setHeader(
-            "WWW-Authenticate",
-            "Basic realm=\"Bank API\""
-        );
-        response.setContentType("application/json");
-        response.getWriter().write(
-            "{\"error\":\"Authentication required\"}"
-        );
-    })
-    .accessDeniedHandler((request, response, exception) -> {
-        response.setStatus(403);
-        response.setContentType("application/json");
-        response.getWriter().write(
-            "{\"error\":\"Access denied\"}"
-        );
-    })
-)
-        .httpBasic(Customizer.withDefaults());
+        .authenticationEntryPoint((request, response, exception) -> {
+            response.setStatus(401);
+            response.setHeader(
+                "WWW-Authenticate",
+                "Basic realm=\"Bank API\""
+            );
+            response.setContentType("application/json");
+            response.getWriter().write(
+                "{\"error\":\"Authentication required\"}"
+            );
+        })
+        .accessDeniedHandler((request, response, exception) -> {
+            response.setStatus(403);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                "{\"error\":\"Access denied\"}"
+            );
+        })
+    )
+        .oauth2ResourceServer(oauth2 -> oauth2
+            .jwt(jwt -> jwt
+                .jwtAuthenticationConverter(
+                    jwtAuthenticationConverter()
+                )
+        )
+    );
 
     return http.build();
 }
@@ -109,6 +117,31 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http)
         source.registerCorsConfiguration("/**", config);
 
         return source;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration configuration) throws Exception {
+
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter(){
+
+        JwtGrantedAuthoritiesConverter authoritiesConverter =
+                new JwtGrantedAuthoritiesConverter();
+
+        authoritiesConverter.setAuthoritiesClaimName("roles");
+
+        authoritiesConverter.setAuthorityPrefix("");
+
+        JwtAuthenticationConverter jwtConverter =
+                new JwtAuthenticationConverter();
+        
+        jwtConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+
+        return jwtConverter;
     }
 
 }
