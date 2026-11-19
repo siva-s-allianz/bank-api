@@ -67,6 +67,7 @@ public class SecurityConfig {
             );
         })
     )
+        .httpBasic(Customizer.withDefaults())
         .oauth2ResourceServer(oauth2 -> oauth2
             .jwt(jwt -> jwt
                 .jwtAuthenticationConverter(
